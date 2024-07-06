@@ -32,10 +32,27 @@ class Client:
 
         self._api_url_base = self.API_URL_PREFIX + domain
         self._accounts_url_base = self.ACCOUNTS_URL_PREFIX + domain
-        self._session.auth = Auth(client_id, self._accounts_url_base, username, password, session=self._auth_session)
+        self._auth = Auth(
+            client_id,
+            self._accounts_url_base,
+            username,
+            password,
+            session=self._auth_session,
+            async_load_oauth=async_load_oauth,
+            async_save_oauth=async_save_oauth,
+        )
+        self._session.auth = self._auth
+
+    async def async_login(self):
+        await self._auth.async_login()
 
     def get_hass_platforms(self):
-        pass
+        return ["button"]
+
+    """Provide callback to refresh access token if needed."""
+
+    def check_auth_refresh(self):
+        self._auth.refresh_access_token_if_needed()
 
     # def login(self):
     #     self._oauth = self.get_oauth()

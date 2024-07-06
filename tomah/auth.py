@@ -10,18 +10,30 @@ from requests.auth import AuthBase
 
 
 class Auth(AuthBase):
-    def __init__(self, client_id, url_base, username, password, session=None):
+    def __init__(
+        self, client_id, url_base, username, password, session=None, async_load_oauth=None, async_save_oauth=None
+    ):
         self._client_id = client_id
         self._url_base = url_base
         self._username = username
         self._password = password
+        self._async_load_oauth = async_load_oauth
+        self._async_save_oauth = async_save_oauth
+
         if session:
             self._session = session
         else:
             self._session = requests.Session()
         self._oauth = None
         self.access_token = None
-        self._load_oauth()
+
+    # TODO: use aiohttp instead of rqeuests?
+    async def async_login(self):
+        if self._async_load_oauth:
+            self._oauth = await self._async_load_oauth()
+            # if self.should_refresh_access_token():
+            #     if not self.refresh_access_token():
+            #         self._authenticate()
 
     def _load_oauth(self):
         # load self._oauth from disk
@@ -34,11 +46,11 @@ class Auth(AuthBase):
         except Exception as e:
             print(f"Failed to load oauth from file: {e}")
             return False
-        return False
+        return True
 
     def _save_oauth(self):
-        with open(self.CREDENTIALS_FILE, "w") as f:
-            json.dump(self._oauth, f)
+        if self._async_save_oauth:
+            self._async_save_oauth(self._oauth)
 
     def access_token_expired(self):
         if not self._oauth:
@@ -75,9 +87,21 @@ class Auth(AuthBase):
         self._save_oauth()
         return True
 
+    def should_refresh_access_token(self):
+        if not self._oauth:
+            return True
+        if "expires_in" not in self._oauth or "created_at" not in self._oauth:
+            return True
+        if self._oauth["created_at"] + (self._oauth["expires_in"] * self.ACCESS_TOKEN_RENEWAL_PCT) < time.time():
+            return True
+
+    def refresh_access_token_if_needed(self):
+        if self.should_refresh_access_token():
+            self.refresh_access_token()
+
     # limit to 5 calls per minute
     @limits(calls=5, period=60)
-    def login(self):
+    def _authenticate(self):
         resp = self._session.post(
             urljoin(self._url_base, "oauth/token"),
             data={
@@ -93,19 +117,19 @@ class Auth(AuthBase):
         self._save_oauth()
         return True
 
-    #
-    # def valid_token(self):
-    #     if not self.access_token_expired()
-    #     if not self._oauth:
-    #         return False
-    #     if self.access_token_expired():
-    #         return False
-    #     return True
+    def valid_token(self):
+        if not self._oauth:
+            return False
+        if self.access_token_expired():
+            return False
+        return True
 
     def __call__(self, req):
-        if self.access_token_expired():
-            self.login()
-            if not self.access_token_expired():
+        if self.should_refresh_access_token():
+            self.refresh_access_token()
+            if not self.valid_token():
+                self._authenticate()
+            if not self.valid_token():
                 raise Exception("Failed to get a valid token")
         self.access_token = self._oauth["access_token"]
         req.headers.update({"Authorization": f"Bearer {self.access_token}"})
