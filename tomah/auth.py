@@ -20,23 +20,25 @@ class Auth(AuthBase):
         self._url_base = url_base
         self._username = username
         self._password = password
-        self._async_load_oauth = async_load_oauth
-        self._async_save_oauth = async_save_oauth
+        self._async_load_oauth_cb = async_load_oauth
+        self._async_save_oauth_cb = async_save_oauth
 
         if session:
             self._session = session
         else:
             self._session = requests.Session()
         self._oauth = None
-        self.access_token = None
 
-    # TODO: use aiohttp instead of rqeuests?
+    # TODO: use aiohttp instead of requests?
     async def async_login(self):
-        if self._async_load_oauth:
-            self._oauth = await self._async_load_oauth()
-            # if self.should_refresh_access_token():
-            #     if not self.refresh_access_token():
-            #         self._authenticate()
+        if self._async_load_oauth_cb:
+            self._oauth = await self._async_load_oauth_cb()
+            # TODO: force refresh of token regardless of whether it's expired?
+            if self.should_refresh_access_token():
+                if not self.refresh_access_token():
+                    self._authenticate()
+        else:
+            self._authenticate()
 
     def _load_oauth(self):
         # load self._oauth from disk
@@ -52,8 +54,8 @@ class Auth(AuthBase):
         return True
 
     def _save_oauth(self):
-        if self._async_save_oauth:
-            self._async_save_oauth(self._oauth)
+        if self._async_save_oauth_cb:
+            self._async_save_oauth_cb(self._oauth)
 
     def access_token_expired(self):
         if not self._oauth:
@@ -69,7 +71,7 @@ class Auth(AuthBase):
     @limits(calls=5, period=60)
     def refresh_access_token(self):
         _LOGGER.debug("refresh access token")
-        if not self._oauth:
+        if not self.access_token:
             _LOGGER.info("no valid refresh token, can't refresh access token")
             return False
         resp = self._session.post(
@@ -79,6 +81,7 @@ class Auth(AuthBase):
                 "client_id": self._client_id,
                 "refresh_token": self._oauth["refresh_token"],
             },
+            headers={"Authorization": f"Bearer {self.access_token}"},
         )
 
         # tell caller to try and re-login
@@ -127,6 +130,12 @@ class Auth(AuthBase):
             return False
         return True
 
+    @property
+    def access_token(self):
+        if not self._oauth or "access_token" in self._oauth:
+            return None
+        return self._oauth["access_token"]
+
     def __call__(self, req):
         if self.should_refresh_access_token():
             self.refresh_access_token()
@@ -134,7 +143,6 @@ class Auth(AuthBase):
                 self._authenticate()
             if not self.valid_token():
                 raise Exception("Failed to get a valid token")
-        self.access_token = self._oauth["access_token"]
         req.headers.update({"Authorization": f"Bearer {self.access_token}"})
         # print(self.access_token)
         return req
