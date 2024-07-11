@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import pprint
 import time
@@ -7,6 +8,8 @@ from urllib.parse import urljoin
 import requests
 from ratelimit import limits
 from requests.auth import AuthBase
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class Auth(AuthBase):
@@ -42,9 +45,9 @@ class Auth(AuthBase):
         try:
             with open(self.CREDENTIALS_FILE, "r") as f:
                 self._oauth = json.load(f)
-                print(f"loaded oauth from file {pprint.pformat(self._oauth)}")
+                _LOGGER.info(f"loaded oauth from file {pprint.pformat(self._oauth)}")
         except Exception as e:
-            print(f"Failed to load oauth from file: {e}")
+            _LOGGER.error(f"Failed to load oauth from file: {e}")
             return False
         return True
 
@@ -58,16 +61,16 @@ class Auth(AuthBase):
         if "expires_in" not in self._oauth or "created_at" not in self._oauth:
             return True
         if self._oauth["created_at"] + self._oauth["expires_in"] < time.time():
-            print("token expired")
+            _LOGGER.debug("token expired")
             return True
         return False
 
     # limit to 5 calls per minute
     @limits(calls=5, period=60)
     def refresh_access_token(self):
-        print("refresh access token")
+        _LOGGER.debug("refresh access token")
         if not self._oauth:
-            print("no valid refresh token, can't refresh access token")
+            _LOGGER.info("no valid refresh token, can't refresh access token")
             return False
         resp = self._session.post(
             urljoin(self._url_base, "oauth/token"),
@@ -80,9 +83,9 @@ class Auth(AuthBase):
 
         # tell caller to try and re-login
         if resp.status_code != 200:
-            print(f"got status code {resp.status_code} from refresh token, try to re-login? {resp.text}")
+            _LOGGER.info(f"got status code {resp.status_code} from refresh token, try to re-login? {resp.text}")
             return False
-        print(f"refreshed access token: {resp.text}")
+        _LOGGER.info(f"refreshed access token: {resp.text}")
         self._oauth = resp.json()
         self._save_oauth()
         return True

@@ -1,9 +1,12 @@
+import logging
 from urllib.parse import urljoin
 
 import json_api_doc
 import requests
 
 from .auth import Auth
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class Client:
