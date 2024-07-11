@@ -31,11 +31,14 @@ class Auth(AuthBase):
 
     # TODO: use aiohttp instead of requests?
     async def async_login(self):
+        _LOGGER.debug("async_login")
         if self._async_load_oauth_cb:
             self._oauth = await self._async_load_oauth_cb()
             # TODO: force refresh of token regardless of whether it's expired?
             if self.should_refresh_access_token():
+                _LOGGER.debug("async_login: access_token expired, refreshing access token")
                 if not self.refresh_access_token():
+                    _LOGGER.debug("async_login: can't refresh access token, re-authenticating")
                     self._authenticate()
         else:
             self._authenticate()
