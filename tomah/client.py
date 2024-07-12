@@ -1,8 +1,8 @@
 import logging
 from urllib.parse import urljoin
 
+import httpx
 import json_api_doc
-import requests
 
 from .auth import Auth
 
@@ -27,11 +27,8 @@ class Client:
         self.units = None
 
         domain_components = domain.split(".")
-        self._session = requests.Session()
-        self._session.headers.update({"User-Agent": domain_components[0] + self.USER_AGENT_SUFFIX})
 
-        self._auth_session = requests.Session()
-        self._auth_session.headers.update({"User-Agent": domain_components[0] + self.USER_AGENT_SUFFIX})
+        self._auth_session = httpx.AsyncClient(headers={"User-Agent": domain_components[0] + self.USER_AGENT_SUFFIX})
 
         self._api_url_base = self.API_URL_PREFIX + domain
         self._accounts_url_base = self.ACCOUNTS_URL_PREFIX + domain
@@ -44,7 +41,9 @@ class Client:
             async_load_oauth=async_load_oauth,
             async_save_oauth=async_save_oauth,
         )
-        self._session.auth = self._auth
+        self._session = httpx.AsyncClient(
+            headers={"User-Agent": domain_components[0] + self.USER_AGENT_SUFFIX}, auth=self._auth
+        )
 
     async def async_login(self):
         await self._auth.async_login()
@@ -61,20 +60,21 @@ class Client:
     #     self._oauth = self.get_oauth()
     #     print(self._oauth)
 
-    def regions(self):
-        resp = self._session.get(urljoin(self._accounts_url_base, "api/mobile/regions"))
+    async def regions(self):
+        resp = await self._session.get(urljoin(self._accounts_url_base, "api/mobile/regions"))
         print(resp.text)
 
-    def tokens(self):
-        resp = self._session.get(urljoin(self._accounts_url_base, "api/v1/account/tokens"))
+    async def tokens(self):
+        """Deprecated."""
+        resp = await self._session.get(urljoin(self._accounts_url_base, "api/v1/account/tokens"))
         print(f"tokens: {resp.text}")
 
-    def devices(self):
-        resp = self._session.get(urljoin(self._api_url_base, "mobile/v4/users/devices"))
+    async def devices(self):
+        resp = await self._session.get(urljoin(self._api_url_base, "mobile/v4/users/devices"))
         print(f"devices: {resp.text}")
 
-    def me(self):
-        resp = self._session.get(urljoin(self._api_url_base, "mobile/v3/me"))
+    async def me(self):
+        resp = await self._session.get(urljoin(self._api_url_base, "mobile/v3/me"))
         return json_api_doc.deserialize(resp.json())
         # return resp.json()
 

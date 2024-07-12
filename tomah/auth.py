@@ -5,14 +5,15 @@ import pprint
 import time
 from urllib.parse import urljoin
 
-import requests
+import httpx
 from ratelimit import limits
-from requests.auth import AuthBase
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class Auth(AuthBase):
+class Auth(httpx.Auth):
+    ACCESS_TOKEN_RENEWAL_PCT = 0.8
+
     def __init__(
         self, client_id, url_base, username, password, session=None, async_load_oauth=None, async_save_oauth=None
     ):
@@ -26,7 +27,7 @@ class Auth(AuthBase):
         if session:
             self._session = session
         else:
-            self._session = requests.Session()
+            self._session = httpx.AsyncClient()
         self._oauth = None
 
     # TODO: use aiohttp instead of requests?
@@ -37,11 +38,11 @@ class Auth(AuthBase):
             # TODO: force refresh of token regardless of whether it's expired?
             if self.should_refresh_access_token():
                 _LOGGER.debug("async_login: access_token expired, refreshing access token")
-                if not self.refresh_access_token():
+                if not await self.refresh_access_token():
                     _LOGGER.debug("async_login: can't refresh access token, re-authenticating")
-                    self._authenticate()
+                    await self._authenticate()
         else:
-            self._authenticate()
+            await self._authenticate()
 
     def _load_oauth(self):
         # load self._oauth from disk
@@ -56,9 +57,9 @@ class Auth(AuthBase):
             return False
         return True
 
-    def _save_oauth(self):
+    async def _save_oauth(self):
         if self._async_save_oauth_cb:
-            self._async_save_oauth_cb(self._oauth)
+            await self._async_save_oauth_cb(self._oauth)
 
     def access_token_expired(self):
         if not self._oauth:
@@ -72,12 +73,12 @@ class Auth(AuthBase):
 
     # limit to 5 calls per minute
     @limits(calls=5, period=60)
-    def refresh_access_token(self):
+    async def refresh_access_token(self):
         _LOGGER.debug("refresh access token")
         if not self.access_token:
             _LOGGER.info("no valid refresh token, can't refresh access token")
             return False
-        resp = self._session.post(
+        resp = await self._session.post(
             urljoin(self._url_base, "oauth/token"),
             data={
                 "grant_type": "password",
@@ -93,7 +94,7 @@ class Auth(AuthBase):
             return False
         _LOGGER.info(f"refreshed access token: {resp.text}")
         self._oauth = resp.json()
-        self._save_oauth()
+        await self._save_oauth()
         return True
 
     def should_refresh_access_token(self):
@@ -110,8 +111,8 @@ class Auth(AuthBase):
 
     # limit to 5 calls per minute
     @limits(calls=5, period=60)
-    def _authenticate(self):
-        resp = self._session.post(
+    async def _authenticate(self):
+        resp = await self._session.post(
             urljoin(self._url_base, "oauth/token"),
             data={
                 "client_id": self._client_id,
@@ -123,7 +124,8 @@ class Auth(AuthBase):
         if resp.status_code != 200:
             raise Exception(f"Failed to login: {resp.text}")
         self._oauth = resp.json()
-        self._save_oauth()
+        _LOGGER.debug(f"authentication successful {self._oauth}")
+        await self._save_oauth()
         return True
 
     def valid_token(self):
@@ -139,13 +141,13 @@ class Auth(AuthBase):
             return None
         return self._oauth["access_token"]
 
-    def __call__(self, req):
+    async def async_auth_flow(self, req):
         if self.should_refresh_access_token():
-            self.refresh_access_token()
+            await self.refresh_access_token()
             if not self.valid_token():
-                self._authenticate()
+                await self._authenticate()
             if not self.valid_token():
                 raise Exception("Failed to get a valid token")
         req.headers.update({"Authorization": f"Bearer {self.access_token}"})
         # print(self.access_token)
-        return req
+        yield req
