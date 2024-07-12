@@ -55,9 +55,8 @@ class Client:
     def get_hass_platforms(self):
         return ["button"]
 
-    """Provide callback to refresh access token if needed."""
-
     async def check_auth_refresh(self):
+        """Provide callback to refresh access token if needed."""
         await self._auth.refresh_access_token_if_needed()
 
     # def login(self):

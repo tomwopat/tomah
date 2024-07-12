@@ -1,7 +1,4 @@
-import json
 import logging
-import os
-import pprint
 import time
 from urllib.parse import urljoin
 
@@ -53,19 +50,6 @@ class Auth(httpx.Auth):
         else:
             await self._authenticate()
 
-    def _load_oauth(self):
-        # load self._oauth from disk
-        if not os.path.exists(self.CREDENTIALS_FILE):
-            return False
-        try:
-            with open(self.CREDENTIALS_FILE, "r") as f:
-                self._oauth = json.load(f)
-                _LOGGER.info(f"loaded oauth from file {pprint.pformat(self._oauth)}")
-        except Exception as e:
-            _LOGGER.error(f"Failed to load oauth from file: {e}")
-            return False
-        return True
-
     async def _save_oauth(self):
         if self._async_save_oauth_cb:
             await self._async_save_oauth_cb(self._oauth)
@@ -113,6 +97,7 @@ class Auth(httpx.Auth):
             return True
         if self._oauth["created_at"] + (self._oauth["expires_in"] * self.token_renewal_pct) < time.time():
             return True
+        return False
 
     async def refresh_access_token_if_needed(self):
         if self.should_refresh_access_token():
@@ -150,13 +135,13 @@ class Auth(httpx.Auth):
             return None
         return self._oauth["access_token"]
 
-    async def async_auth_flow(self, req):
+    async def async_auth_flow(self, request):
         if self.should_refresh_access_token():
             await self.refresh_access_token()
             if not self.valid_token():
                 await self._authenticate()
             if not self.valid_token():
                 raise Exception("Failed to get a valid token")
-        req.headers.update({"Authorization": f"Bearer {self.access_token}"})
+        request.headers.update({"Authorization": f"Bearer {self.access_token}"})
         # print(self.access_token)
-        yield req
+        yield request
