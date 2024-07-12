@@ -137,7 +137,7 @@ class Auth(httpx.Auth):
 
     @property
     def access_token(self):
-        if not self._oauth or "access_token" in self._oauth:
+        if not self._oauth or "access_token" not in self._oauth:
             return None
         return self._oauth["access_token"]
 
