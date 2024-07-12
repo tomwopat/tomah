@@ -51,6 +51,7 @@ class Client:
 
     async def async_login(self):
         await self._auth.async_login()
+        await self.query_units()
 
     def get_hass_platforms(self):
         return ["button"]
@@ -63,9 +64,24 @@ class Client:
     #     self._oauth = self.get_oauth()
     #     print(self._oauth)
 
+    async def query_units(self):
+        me = await self.me()
+        self.units = me["units"]
+
+    def access_points(self):
+        for unit in self.units:
+            for access_point in unit["access_points"]:
+                yield {
+                    "name": access_point["name"],
+                    "unit_id": unit["id"],
+                    "device_id": access_point["device_id"],
+                    "device_type": access_point["device_type"],
+                }
+
     async def regions(self):
         resp = await self._session.get(urljoin(self._accounts_url_base, "api/mobile/regions"))
-        print(resp.text)
+        _LOGGER.debug(f"regions: {resp.text}")
+        return resp.json()
 
     async def tokens(self):
         """Deprecated."""
