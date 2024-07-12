@@ -90,7 +90,7 @@ class Auth(httpx.Auth):
         resp = await self._session.post(
             urljoin(self._url_base, "oauth/token"),
             data={
-                "grant_type": "password",
+                "grant_type": "refresh_token",
                 "client_id": self._client_id,
                 "refresh_token": self._oauth["refresh_token"],
             },

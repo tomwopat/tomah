@@ -32,6 +32,9 @@ class Client:
 
         self._api_url_base = self.API_URL_PREFIX + domain
         self._accounts_url_base = self.ACCOUNTS_URL_PREFIX + domain
+        kwargs = {}
+        if token_renewal_pct is not None:
+            kwargs["token_renewal_pct"] = token_renewal_pct
         self._auth = Auth(
             client_id,
             self._accounts_url_base,
@@ -40,6 +43,7 @@ class Client:
             session=self._auth_session,
             async_load_oauth=async_load_oauth,
             async_save_oauth=async_save_oauth,
+            **kwargs,
         )
         self._session = httpx.AsyncClient(
             headers={"User-Agent": domain_components[0] + self.USER_AGENT_SUFFIX}, auth=self._auth
