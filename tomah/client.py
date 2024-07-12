@@ -53,8 +53,8 @@ class Client:
 
     """Provide callback to refresh access token if needed."""
 
-    def check_auth_refresh(self):
-        self._auth.refresh_access_token_if_needed()
+    async def check_auth_refresh(self):
+        await self._auth.refresh_access_token_if_needed()
 
     # def login(self):
     #     self._oauth = self.get_oauth()

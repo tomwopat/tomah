@@ -15,7 +15,15 @@ class Auth(httpx.Auth):
     ACCESS_TOKEN_RENEWAL_PCT = 0.8
 
     def __init__(
-        self, client_id, url_base, username, password, session=None, async_load_oauth=None, async_save_oauth=None
+        self,
+        client_id,
+        url_base,
+        username,
+        password,
+        session=None,
+        async_load_oauth=None,
+        async_save_oauth=None,
+        token_renewal_pct=ACCESS_TOKEN_RENEWAL_PCT,
     ):
         self._client_id = client_id
         self._url_base = url_base
@@ -23,6 +31,7 @@ class Auth(httpx.Auth):
         self._password = password
         self._async_load_oauth_cb = async_load_oauth
         self._async_save_oauth_cb = async_save_oauth
+        self.token_renewal_pct = token_renewal_pct
 
         if session:
             self._session = session
@@ -102,12 +111,12 @@ class Auth(httpx.Auth):
             return True
         if "expires_in" not in self._oauth or "created_at" not in self._oauth:
             return True
-        if self._oauth["created_at"] + (self._oauth["expires_in"] * self.ACCESS_TOKEN_RENEWAL_PCT) < time.time():
+        if self._oauth["created_at"] + (self._oauth["expires_in"] * self.token_renewal_pct) < time.time():
             return True
 
-    def refresh_access_token_if_needed(self):
+    async def refresh_access_token_if_needed(self):
         if self.should_refresh_access_token():
-            self.refresh_access_token()
+            await self.refresh_access_token()
 
     # limit to 5 calls per minute
     @limits(calls=5, period=60)
