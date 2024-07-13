@@ -97,6 +97,36 @@ class Client:
         return json_api_doc.deserialize(resp.json())
         # return resp.json()
 
+    # data[type]=door_release_requests
+    # data[relationships][unit][data][id]=931502
+    # data[relationships][device][data][type]=panels
+    # data[relationships][device][data][id]=12064
+    # data[attributes][release_method]=front_door_view
+
+    async def door_release(self, access_point):
+        if "unit_id" not in access_point or "device_id" not in access_point or "device_type" not in access_point:
+            # TODO: raise exception?
+            return None
+
+        door_release_requests_payload = {
+            "data[type]": "door_release_requests",
+            "data[relationships][unit][data][id]": access_point["unit_id"],
+            "data[relationships][device][data][type]": access_point["device_type"],
+            "data[relationships][device][data][id]": access_point["device_id"],
+            "data[attributes][release_method]": "front_door_view",
+        }
+
+        resp = await self._session.post(
+            urljoin(self._api_url_base, "mobile/v3/door_release_requests"),
+            data=door_release_requests_payload,
+        )
+
+        if resp.status_code < 200 or resp.status_code >= 300:
+            _LOGGER.error(f"Failed to create door release request: {resp.text}")
+            return None
+
+        return json_api_doc.deserialize(resp.json())
+
     # def get_oauth(self):
     #     resp = self._session.post(
     #         urljoin(self.ACCOUNTS_URL_PREFIX, "oauth/token"),

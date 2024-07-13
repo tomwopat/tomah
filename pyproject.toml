@@ -19,7 +19,8 @@ dev = [
   "black>=21.12b0",
   "flake8>=4.0.1",
   "isort>=5.10.2",
-  "pylint>=3.2.5"
+  "pylint>=3.2.5",
+  "homeassistant-cli>=0.9.6"
 ]
 
 [tool.black]
