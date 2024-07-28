@@ -2,7 +2,7 @@ ATTR_NAME = "name"
 DEFAULT_NAME = "World"
 # Storage constants
 STORAGE_VERSION = 1
-STORAGE_KEY = "my_integration_storage"
+STORAGE_KEY = "tomah_oauth"
 DOMAIN = "tomah"
 
 # Data keys

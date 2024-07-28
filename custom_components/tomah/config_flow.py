@@ -1,8 +1,8 @@
 import logging
+from typing import Optional
 
 import voluptuous as vol
 from homeassistant import config_entries
-from typing import Optional
 
 from .const import DOMAIN
 
@@ -16,13 +16,30 @@ class TomahConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self):
         pass
 
-    async def async_step_user(self, info: Optional[dict] = None):
-        if info is not None:
-            _LOGGER.warning(f"config info: {info}")
-            return self.async_create_entry(title=DOMAIN, data=info)
+    async def async_step_user(self, user_input: Optional[dict] = None):
+        if user_input is not None:
+            _LOGGER.warning(f"config info: {user_input}")
+            return self.async_create_entry(title=DOMAIN, data=user_input)
 
         return self.async_show_form(
             step_id="user",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("username"): str,
+                    vol.Required("password"): str,
+                    vol.Required("client_id"): str,
+                    vol.Required("domain"): str,
+                }
+            ),
+        )
+
+    async def async_step_reconfigure(self, user_input):
+        if user_input is not None:
+            _LOGGER.warning(f"config info: {user_input}")
+            return self.async_create_entry(title=DOMAIN, data=user_input)
+
+        return self.async_show_form(
+            step_id="reconfigure",
             data_schema=vol.Schema(
                 {
                     vol.Required("username"): str,
