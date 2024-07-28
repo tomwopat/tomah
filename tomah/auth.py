@@ -116,7 +116,7 @@ class Auth(httpx.Auth):
             },
         )
         if resp.status_code != 200:
-            raise Exception(f"Failed to login: {resp.text}")
+            raise AuthFailureException(f"Failed to login: {resp.text}")
         self._oauth = resp.json()
         _LOGGER.debug(f"authentication successful {self._oauth}")
         await self._save_oauth()
@@ -141,7 +141,11 @@ class Auth(httpx.Auth):
             if not self.valid_token():
                 await self._authenticate()
             if not self.valid_token():
-                raise Exception("Failed to get a valid token")
+                raise AuthFailureException("Failed to get a valid token")
         request.headers.update({"Authorization": f"Bearer {self.access_token}"})
         # print(self.access_token)
         yield request
+
+
+class AuthFailureException(Exception):
+    pass
